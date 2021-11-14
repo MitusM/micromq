@@ -1,9 +1,9 @@
-const methods = require('methods');
-const pathToRegex = require('path-to-regexp');
-const prometheus = require('prom-client');
-const RabbitApp = require('./RabbitApp');
-const RpcActions = require('./managers/RpcActions');
-const { toArray } = require('./utils');
+const methods = require("methods");
+const pathToRegex = require("path-to-regexp").pathToRegexp;
+const prometheus = require("prom-client");
+const RabbitApp = require("./RabbitApp");
+const RpcActions = require("./managers/RpcActions");
+const { toArray } = require("./utils");
 
 class BaseApp extends RabbitApp {
   constructor(options) {
@@ -18,38 +18,42 @@ class BaseApp extends RabbitApp {
     if (this._middlewares.length > idx + 1) {
       const { match, fn } = this._middlewares[idx + 1];
 
-      return match(req)
-        ? fn(req, res)
-        : this._next(req, res, idx + 1);
+      return match(req) ? fn(req, res) : this._next(req, res, idx + 1);
     }
   }
 
   _createEndpoint(path, method, ...middlewares) {
-    const paths = path && toArray(path).map((path) => {
-      const keys = [];
+    const paths =
+      path &&
+      toArray(path).map((path) => {
+        const keys = [];
 
-      return {
-        regex: pathToRegex(path, keys),
-        keys,
-      };
-    });
+        return {
+          regex: pathToRegex(path, keys),
+          keys,
+        };
+      });
 
     middlewares.forEach((middleware) => {
       const idx = this._middlewares.length;
 
       this._middlewares.push({
         match: (req) => {
-          const pathMatch = !paths || paths.find(path => path.regex.test(req.path));
+          const pathMatch =
+            !paths || paths.find((path) => path.regex.test(req.path));
           const methodMatch = !method || req.method === method;
 
-          if (typeof pathMatch === 'object') {
+          if (typeof pathMatch === "object") {
             req.params = {
               ...req.params,
-              ...req.path.match(pathMatch.regex).slice(1).reduce((object, value, index) => {
-                const { name } = pathMatch.keys[index];
+              ...req.path
+                .match(pathMatch.regex)
+                .slice(1)
+                .reduce((object, value, index) => {
+                  const { name } = pathMatch.keys[index];
 
-                return name ? { ...object, [name]: value } : object;
-              }, {}),
+                  return name ? { ...object, [name]: value } : object;
+                }, {}),
             };
           }
 
@@ -89,35 +93,41 @@ class BaseApp extends RabbitApp {
   }
 
   enablePrometheus(...args) {
-    let endpoint = '/metrics';
+    let endpoint = "/metrics";
     let credentials = {};
 
-    if (args[0] && typeof args[0] === 'string') {
+    if (args[0] && typeof args[0] === "string") {
       endpoint = args[0];
     }
 
-    if (args[0] && typeof args[0] === 'object') {
+    if (args[0] && typeof args[0] === "object") {
       credentials = args[0];
     }
 
-    if (args[1] && typeof args[1] === 'object') {
+    if (args[1] && typeof args[1] === "object") {
       credentials = args[1];
     }
 
     const histogram = new prometheus.Histogram({
-      name: 'http_request_duration_ms',
-      help: 'HTTP-requests information',
-      labelNames: ['code', 'url'],
+      name: "http_request_duration_ms",
+      help: "HTTP-requests information",
+      labelNames: ["code", "url"],
       buckets: [0.1, 0.5, 5, 15, 50, 100, 500],
     });
-    const basicAuth = `Basic ${Buffer.from(`${credentials.user}:${credentials.password}`).toString('base64')}`;
+    const basicAuth = `Basic ${Buffer.from(
+      `${credentials.user}:${credentials.password}`
+    ).toString("base64")}`;
 
     this.get(
       endpoint,
       async (req, res, next) => {
-        if (credentials.user && credentials.password && req.headers.authorization !== basicAuth) {
+        if (
+          credentials.user &&
+          credentials.password &&
+          req.headers.authorization !== basicAuth
+        ) {
           res.writeHead(403);
-          res.end('Access Denied.');
+          res.end("Access Denied.");
 
           return;
         }
@@ -125,9 +135,9 @@ class BaseApp extends RabbitApp {
         await next();
       },
       (req, res) => {
-        res.writeHead(200, { 'Content-Type': prometheus.register.contentType });
+        res.writeHead(200, { "Content-Type": prometheus.register.contentType });
         res.end(prometheus.register.metrics());
-      },
+      }
     );
 
     this.use(async (req, res, next) => {
@@ -136,9 +146,7 @@ class BaseApp extends RabbitApp {
       await next();
 
       if (req.path !== endpoint) {
-        histogram
-          .labels(res.statusCode, req.path)
-          .observe(Date.now() - start);
+        histogram.labels(res.statusCode, req.path).observe(Date.now() - start);
       }
     });
   }
@@ -157,7 +165,7 @@ class BaseApp extends RabbitApp {
 }
 
 methods.forEach((method) => {
-  BaseApp.prototype[method] = function(path, ...middlewares) {
+  BaseApp.prototype[method] = function (path, ...middlewares) {
     this._createEndpoint(path, method, ...middlewares);
 
     return this;
