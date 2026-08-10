@@ -35,12 +35,16 @@ module.exports.upgradeServerResponse = async (req, res, next) => {
   };
 
   res.json = function(response) {
-    writeHead(this.statusCode, {
-      ...this.headers,
-      'Content-Type': 'application/json',
-    });
+    const body = JSON.stringify(response);
 
-    return this.end(JSON.stringify(response));
+    if (!this.headersSent) {
+      writeHead(this.statusCode, {
+        ...this.headers,
+        'Content-Type': 'application/json',
+      });
+    }
+
+    return this.end(body);
   };
 
   await next();

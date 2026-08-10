@@ -18,7 +18,10 @@ app.action('authorize', (meta, res) => {
     return;
   }
 
-  res.writeHead(200, { 'Set-Cookie': `userId=${meta.userId}` });
+  res.writeHead(200, {
+    'Set-Cookie': `userId=${meta.userId}`,
+    'Content-Type': 'application/json',
+  });
   res.json({ isAuthorized: true });
 });
 
