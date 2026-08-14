@@ -11,7 +11,6 @@ module.exports.prepareRequest = async (req, res, next) => {
   req.body = body;
   req.query = query;
   req.params = {};
-  req.session = {};
 
   await next();
 };

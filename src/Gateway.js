@@ -122,6 +122,7 @@ class Gateway extends Server {
           headers: req.headers,
           cookies: req.cookies,
           session: req.session,
+          sessionID: req.sessionID,
           connection: {
             connecting: req.connection.connecting,
             destroyed: req.connection.destroyed,
