@@ -66,6 +66,19 @@ class Gateway extends Server {
           const request = this._requests.get(requestId);
 
           if (!request || !response) {
+            // Ответ МС без тела (напр. auth: signin csrf-fail шлёт end() без аргумента).
+            // Не дропаем молча — отвечаем, иначе клиент висит до таймаута (HTTP 000).
+            if (request && request.res && request.timer) {
+              clearTimeout(request.timer);
+            }
+            if (request && request.res) {
+              request.res.writeHead(statusCode || 204, headers || {});
+              request.res.end();
+            }
+            if (request) {
+              request.resolve && request.resolve();
+              this._requests.delete(requestId);
+            }
             channel.ack(message);
 
             return;
@@ -76,7 +89,18 @@ class Gateway extends Server {
           clearTimeout(timer);
 
           if (isRpcAction(response)) {
-            await this._actions.handle(response, res);
+            try {
+              await this._actions.handle(response, res);
+            } catch (err) {
+              // Action упал — не роняем gateway, отвечаем клиенту развёрнуто.
+              debug(() => `gateway action error: ${err && err.message}`);
+              if (res && !res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'gateway action failed', message: (err && err.message) || String(err) }));
+              } else if (res && res.writeHead && typeof res.end === 'function') {
+                try { res.end(); } catch (_) {}
+              }
+            }
           } else {
             res.writeHead(statusCode, headers);
             res.end(typeof response === 'object' ? JSON.stringify(response) : response);
