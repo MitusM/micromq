@@ -102,6 +102,23 @@ class Gateway extends Server {
               }
             }
           } else {
+            // Бинарные ответы от микросервиса: contract { __frtBase64, contentType? }.
+            // RPC-шина сериализует через JSON (Buffer ломается), поэтому микросервис
+            // отдаёт PNG/файл как base64-строку, а Gateway декодирует в Buffer и
+            // пишет настоящие байты клиенту. Любой МС может слать бинарные данные.
+            if (response && typeof response === 'object' && typeof response.__frtBase64 === 'string') {
+              const body = Buffer.from(response.__frtBase64, 'base64');
+              res.writeHead(statusCode || 200, {
+                ...(headers || {}),
+                'Content-Type': response.contentType || headers && headers['Content-Type'] || 'application/octet-stream',
+                'Content-Length': body.length,
+              });
+              res.end(body);
+              resolve();
+              channel.ack(message);
+              this._requests.delete(requestId);
+              return;
+            }
             res.writeHead(statusCode, headers);
             res.end(typeof response === 'object' ? JSON.stringify(response) : response);
           }
